@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de XP - Tibia</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input[type=number], .switch {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0 15px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .result {
+      margin-top: 20px;
+      background: #eef;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .switch-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .switch-wrapper label {
+      flex: 1;
+    }
+    .switch-wrapper input {
+      width: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Comparador de Hunt - Tibia</h2>
+    <p>Simule o custo-benefício entre caçar com <strong>Stamina Extension</strong> (sem XP Boost) e caçar com <strong>XP Boost</strong> (sem Stamina Extension).<br>
+    Ative ou desative bônus como Double XP e Prey para adaptar ao seu cenário.</p>
+
+    <label>XP base por hora (kk):</label>
+    <input type="number" id="xpBase" value="1" step="0.1">
+
+    <label>Preço por TC (k):</label>
+    <input type="number" id="precoTC" value="30" step="1">
+
+    <label>Stamina Extension (preço em kk):</label>
+    <input type="number" id="staminaExt" value="5" step="0.1">
+
+    <label>Horas totais da hunt:</label>
+    <input type="number" id="horasTotais" value="4" step="1">
+
+    <div class="switch-wrapper">
+      <label for="doubleXP">Evento Double XP (100%):</label>
+      <input type="checkbox" id="doubleXP" checked>
+    </div>
+    <div class="switch-wrapper">
+      <label for="preyBonus">Bônus de Prey (40%):</label>
+      <input type="checkbox" id="preyBonus" checked>
+    </div>
+    <div class="switch-wrapper">
+      <label for="useXPBoost">Usar XP Boost:</label>
+      <input type="checkbox" id="useXPBoost" checked onchange="toggleXPBoostInput()">
+    </div>
+
+    <div id="xpBoostInput">
+      <label>Total de XP Boosts (1 hora cada):</label>
+      <input type="number" id="xpBoosts" value="4" step="1">
+    </div>
+
+    <button onclick="calcular()">Calcular</button>
+
+    <div class="result" id="resultado"></div>
+  </div>
+
+  <script>
+    function toggleXPBoostInput() {
+      const show = document.getElementById('useXPBoost').checked;
+      document.getElementById('xpBoostInput').style.display = show ? 'block' : 'none';
+    }
+
+    function calcular() {
+      const xpBase = parseFloat(document.getElementById('xpBase').value) * 1000000;
+      const precoTC = parseFloat(document.getElementById('precoTC').value) * 1000;
+      const staminaExt = parseFloat(document.getElementById('staminaExt').value) * 1000000;
+      const horasTotais = parseInt(document.getElementById('horasTotais').value);
+      const doubleXP = document.getElementById('doubleXP').checked ? 1.0 : 0;
+      const preyBonus = document.getElementById('preyBonus').checked ? 0.4 : 0;
+      const useXPBoost = document.getElementById('useXPBoost').checked;
+      const xpBoosts = useXPBoost ? parseInt(document.getElementById('xpBoosts').value) : 0;
+
+      const bonusAditivo = 1 + doubleXP + preyBonus;
+      const boostAditivo = 0.5;
+      const multiplicadorStamina = 1.5;
+
+      const horasGratuitasStamina = 3;
+      const horasComStaminaExt = Math.max(0, horasTotais - horasGratuitasStamina);
+
+      // Cenário A: Stamina Extension, sem XP Boost
+      const xpHoraA = xpBase * bonusAditivo * multiplicadorStamina;
+      const xpTotalA = xpHoraA * horasTotais;
+      const custoA = horasComStaminaExt * staminaExt;
+      const custoPorXpA = custoA / xpTotalA * 1000000;
+
+      // Cenário B: XP Boosts, 3h com Stamina, resto sem
+      let xpTotalB = 0;
+      for (let i = 0; i < horasTotais; i++) {
+        const boost = (useXPBoost && xpBoosts > i) ? boostAditivo : 0;
+        const aditivo = bonusAditivo + boost;
+        const multi = i < horasGratuitasStamina ? multiplicadorStamina : 1.0;
+        xpTotalB += xpBase * aditivo * multi;
+      }
+
+      // Cálculo do custo total dos XP Boosts com aumento progressivo
+      const boostPrecos = [30, 45, 90, 180, 360];
+      let custoBoostTotalTC = 0;
+      for (let i = 0; i < xpBoosts; i++) {
+        const custoTC = boostPrecos[i] || boostPrecos[boostPrecos.length - 1];
+        custoBoostTotalTC += custoTC;
+      }
+      const custoB = custoBoostTotalTC * precoTC;
+      const custoPorXpB = custoB / xpTotalB * 1000000;
+
+      document.getElementById('resultado').innerHTML = `
+        <b>Cenário A - Stamina Extension (sem XP Boost):</b><br>
+        XP total: ${(xpTotalA/1000000).toFixed(2)}kk<br>
+        Custo: ${custoA.toLocaleString()} gp<br>
+        Custo por 1kk XP: ${Math.round(custoPorXpA).toLocaleString()} gp<br><br>
+
+        <b>Cenário B - XP Boost (sem Stamina Extension):</b><br>
+        XP total: ${(xpTotalB/1000000).toFixed(2)}kk<br>
+        Custo: ${custoB.toLocaleString()} gp<br>
+        Custo por 1kk XP: ${Math.round(custoPorXpB).toLocaleString()} gp
+      `;
+    }
+
+    // Esconde o campo de XP Boosts se desmarcado
+    window.onload = toggleXPBoostInput;
+  </script>
+</body>
+</html>
